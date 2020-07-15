@@ -1,51 +1,89 @@
 package main
 
 import (
-    "encoding/json"
-    "github.com/gorilla/mux"
-    "log"
-    "net/http"
+	"encoding/csv"
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+    "fmt"
+	"github.com/gorilla/mux"
 )
 
-// "Person type" (tipo um objeto)
-type Person struct {
-    ID        string   `json:"id,omitempty"`
-    Firstname string   `json:"firstname,omitempty"`
-    Lastname  string   `json:"lastname,omitempty"`
-    Address   *Address `json:"address,omitempty"`
-}
-type Address struct {
-    City  string `json:"city,omitempty"`
-    State string `json:"state,omitempty"`
-}
 
-var people []Person
-
-// GetPeople mostra todos os contatos da variável people
-func GetStocks(w http.ResponseWriter, r *http.Request) {
-    json.NewEncoder(w).Encode(people)
+type Stock struct {
+	Ticker       string `json:"ticker,omitempty"`
+	Co           string `json:"co,omitempty"`
+	Endprice     string `json:"endprice,omitempty"`
+	Openprice    string `json:"openprice,omitempty"`
+	Currentprice string `json:"currentprice,omitempty"`
+	Varreais     string `json:"varreais,omitempty"`
+	Varcent      string `json:"varcent,omitempty"`
 }
 
-// GetPerson mostra apenas um contato
-func GetStock(w http.ResponseWriter, r *http.Request) {
-    params := mux.Vars(r)
-    for _, item := range people {
-        if item.ID == params["id"] {
-            json.NewEncoder(w).Encode(item)
-            return
-        }
+var stocks []Stock
+
+func ReadCsv() ([][]string, error) {
+
+    f, err := os.Open("input.csv")
+    if err != nil {
+        return [][]string{}, err
     }
-    json.NewEncoder(w).Encode(&Person{})
+    defer f.Close()
+
+    // Read File into a Variable
+    s, err := csv.NewReader(f).ReadAll()
+    if err != nil {
+        return [][]string{}, err
+    }
+
+    return s, nil
 }
 
-// função principal para executar a api
+func GetStocks(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(stocks)
+}
+
+
+func GetStock(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	for _, item := range stocks {
+		if item.Ticker == params["ticker"] {
+			json.NewEncoder(w).Encode(item)
+			return
+		}
+	}
+	json.NewEncoder(w).Encode(&Stock{})
+}
+
 func main() {
-    router := mux.NewRouter()
-    people = append(people, Person{ID: "1", Firstname: "John", Lastname: "Doe", Address: &Address{City: "City X", State: "State X"}})
-    people = append(people, Person{ID: "2", Firstname: "Koko", Lastname: "Doe", Address: &Address{City: "City Z", State: "State Y"}})
-	
+	router := mux.NewRouter()
+
+	s, err := ReadCsv()
+    if err != nil {
+        panic(err)
+    }
+
+    for _, e := range s {
+        data := Stock{
+            Ticker: e[0],
+			Co: e[1],
+			Endprice: e[2],
+			Openprice: e[3],
+			Currentprice: e[4],
+			Varreais: e[5],
+			Varcent: e[6],			
+        }
+
+        fmt.Println(data.Ticker + " " + data.Co + " " + data.Endprice + " " + data.Currentprice + " " + data.Varreais + " " + data.Varcent)
+
+        stocks = append(stocks, data)
+    }
+
+
+
 	router.HandleFunc("/stocks", GetStocks).Methods("GET")
-    router.HandleFunc("/stocks/{id}", GetStock).Methods("GET")
-	
+	router.HandleFunc("/stocks/{ticker}", GetStock).Methods("GET")
+
 	log.Fatal(http.ListenAndServe(":8000", router))
 }
